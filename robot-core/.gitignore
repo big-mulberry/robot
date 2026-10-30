@@ -1,0 +1,4 @@
+# CMake build directories
+/build/
+/examples/build/
+/tests/build/

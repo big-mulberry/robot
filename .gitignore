@@ -1,0 +1,23 @@
+# Generated CMake / ROS 2 files
+build/
+install/
+log/
+compile_commands.json
+CMakeUserPresets.json
+
+# Local editor configuration (contains machine-specific paths)
+.vscode/
+.idea/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Caches and OS files
+__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
