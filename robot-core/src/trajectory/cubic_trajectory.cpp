@@ -13,58 +13,53 @@ TrajectoryPoint interpolateCubic(
     double t,
     double duration)
 {
-    // TODO 1：
-    // 检查 p0、p1、t、duration 是否为有限数。
-    // 检查 duration 是否大于 0。
-    // 参数不合法时抛出 std::invalid_argument。
-    if (!(std::isfinite(p0) && std::isfinite(p1) && std::isfinite(t) && std::isfinite(duration) && duration > 0))
+    return interpolateCubic(p0, p1, 0.0, 0.0, t, duration);
+}
+TrajectoryPoint interpolateCubic(double p0, double p1, double v0, double v1, double t, double duration)
+{
+    // TODO 1:
+    // 验证所有输入是否为有限数。
+    // duration > 0
+    if (!std::isfinite(p0) || !std::isfinite(p1) ||
+        !std::isfinite(v0) || !std::isfinite(v1) ||
+        !std::isfinite(t) || !std::isfinite(duration) ||
+        duration <= 0.0)
     {
-        throw std::invalid_argument("Invalid input parameters.");
+        throw std::invalid_argument(
+            "Inputs must be finite, duration positive.");
     }
 
-    // TODO 2：
-    // 将 t 限制在 [0, duration]。
-    const double clamped_t = std::clamp(t, 0.0, duration);
-
-    // TODO 3：
-    // 计算归一化时间 s。
-    const double s = clamped_t / duration;
-
-    // TODO 4：
-    // 计算位移 delta_p。
-    const double delta_p = p1 - p0;
-
-    TrajectoryPoint result{};
-
-    // TODO 5：
-    // 根据三次多项式计算位置。
-    result.position = p0 + delta_p * (3 * s * s - 2 * s * s * s);
-
-    // TODO 6：
-    // 计算速度。
-    result.velocity = delta_p * (6 * s - 6 * s * s) / duration;
-
-    // TODO 7：
-    // 计算加速度。
-    result.acceleration = delta_p * (6 - 12 * s) / (duration * duration);
-
-    // TODO 8：
-    // 处理运动区间外的静止状态：
-    // t < 0 或 t > duration 时，
-    // 位置保持端点，速度和加速度均为 0。
     if (t < 0.0)
     {
-        result.position = p0;
-        result.velocity = 0.0;
-        result.acceleration = 0.0;
+        return TrajectoryPoint{p0, 0.0, 0.0};
     }
-    else if (t > duration)
+
+    if (t > duration)
     {
-        result.position = p1;
-        result.velocity = 0.0;
-        result.acceleration = 0.0;
+        return TrajectoryPoint{p1, 0.0, 0.0};
     }
+
+    const double T = duration;
+    const double delta_p = p1 - p0;
+
+    const double a0 = p0;
+    const double a1 = v0;
+
+    // TODO 2:
+    // 根据本节推导，计算 a2、a3。
+    const double a2 = (3 * delta_p - (2 * v0 + v1) * T) / (T * T);
+    const double a3 = (-2 * delta_p + (v0 + v1) * T) / (T * T * T);
+
+    // TODO 3:
+    // 根据三次多项式及其一、二阶导数，
+    // 计算 position、velocity、acceleration。
+    TrajectoryPoint result{};
+    result.position = a0 + a1 * t + a2 * t * t + a3 * t * t * t;
+    result.velocity = a1 + 2 * a2 * t + 3 * a3 * t * t;
+    result.acceleration = 2 * a2 + 6 * a3 * t;
+
+    // TODO 4:
+    // 返回 TrajectoryPoint。
     return result;
 }
-
 }
