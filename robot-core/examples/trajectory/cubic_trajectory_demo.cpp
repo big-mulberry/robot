@@ -74,5 +74,29 @@ int main()
     checkState("终点之后",interpolateCubic(0,1,0,1.5,1.1,1),1,0,0);
     // a2=1.5、a3=-0.5，终点加速度为 2*a2+6*a3=0。
     checkState("恰好终点",interpolateCubic(0,1,0,1.5,1,1),1,1.5,0);
+
+    // TRAJ-11B: 当前仅检查声明、链接和显式未实现状态，不宣称功能测试通过。
+    const TwoSegmentCubicTrajectory two_segment{
+        .first = {.p0=0.0, .p1=1.0, .v0=0.0, .v1=1.5, .duration=1.0},
+        .second = {.p0=1.0, .p1=3.0, .v0=1.5, .v1=0.0, .duration=1.0}
+    };
+    const auto showTraj11b = [](const char* label, auto action) {
+        try {
+            action();
+            std::cout << "[INFO] " << label << " returned; add TODO assertions.\n";
+        } catch (const std::logic_error& error) {
+            std::cout << "[TODO] " << error.what() << '\n';
+        }
+    };
+    showTraj11b("sampling", [&] { (void)sampleTwoSegmentCubic(two_segment, 1.5); });
+    showTraj11b("continuity", [&] { (void)checkJunctionContinuity(two_segment); });
+    // TODO(TRAJ-11B-tests): 完成实现后用现有 require/near/checkState 添加断言：
+    // 1. 上述轨迹误差 (0,0,6)，C0/C1=true，C2=false。
+    // 2. 全局 t=1.5 的 (p,v,a)=(2.1875,2.625,-1.5)。
+    // 3. second.p0=1.01 时 C0/C1/C2 均 false。
+    // 4. second.v0=1.2 时 C0=true，C1/C2=false。
+    // 5. t=-0.1 / 2.1 返回 (0,0,0) / (3,0,0)。
+    // 6. t=0、1、2 保留真实边界状态；非法 duration、时间、容差
+    //    (含 NaN/Inf、负容差、总时长溢出) 抛 invalid_argument。
     return 0;
 }

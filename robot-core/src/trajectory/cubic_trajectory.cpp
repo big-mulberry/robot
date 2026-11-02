@@ -62,4 +62,35 @@ TrajectoryPoint interpolateCubic(double p0, double p1, double v0, double v1, dou
     // 返回 TrajectoryPoint。
     return result;
 }
+
+TrajectoryPoint sampleTwoSegmentCubic(
+    const TwoSegmentCubicTrajectory& trajectory,
+    double global_time)
+{
+    // TODO(TRAJ-11B-1): 验证 global_time、两个 duration 有限且 duration > 0；
+    // 相加后的 total_duration 也必须有限。无效输入抛 std::invalid_argument。
+    // TODO(TRAJ-11B-2): 处理全局时间越界静止、第一段/第二段选择；
+    // 第二段将 global_time 转换为局部时间，拼接时刻使用第一段。
+    // 对选中的 segment 复用现有接口，不重复实现多项式：
+    // interpolateCubic(segment.p0, segment.p1, segment.v0, segment.v1,
+    //                  local_time, segment.duration);
+    (void)trajectory;
+    (void)global_time;
+    throw std::logic_error("TRAJ-11B: sampleTwoSegmentCubic TODO");
+}
+
+JunctionContinuity checkJunctionContinuity(
+    const TwoSegmentCubicTrajectory& trajectory,
+    const ContinuityTolerance& tolerance)
+{
+    // TODO(TRAJ-11B-3): 验证三个容差有限且 >= 0，否则抛 invalid_argument。
+    // 复用六参数 interpolateCubic，分别采样 first 的 t=duration
+    // 和 second 的 t=0；不可使用越界静止状态替代真实边界。
+    // TODO(TRAJ-11B-4): 用 std::abs 计算位置、速度、加速度误差，
+    // 按各自单位的容差判断 C0、C1、C2；高阶连续必须包含低阶连续。
+    (void)trajectory;
+    (void)tolerance;
+    throw std::logic_error("TRAJ-11B: checkJunctionContinuity TODO");
+}
+
 }
