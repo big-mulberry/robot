@@ -88,16 +88,6 @@ struct JunctionContinuity
 };
 
 /**
- * 全局时间采样；拼接时刻属于第一段，第二段使用局部时间。
- * 越界保持整条轨迹的起点/终点静止；边界时刻保留多项式状态。
- * 完成后：非有限时间、非正/非有限时长或总时长溢出抛 invalid_argument。
- * 当前骨架抛 std::logic_error，待完成 TODO 后替换。
- */
-TrajectoryPoint sampleTwoSegmentCubic(
-    const TwoSegmentCubicTrajectory& trajectory,
-    double global_time);
-
-/**
  * 比较第一段终点与第二段起点，C1 包含 C0，C2 包含 C1。
  * 完成后：容差必须有限且非负，否则抛 invalid_argument。
  * 当前骨架抛 std::logic_error，待完成 TODO 后替换。
@@ -105,5 +95,21 @@ TrajectoryPoint sampleTwoSegmentCubic(
 JunctionContinuity checkJunctionContinuity(
     const TwoSegmentCubicTrajectory& trajectory,
     const ContinuityTolerance& tolerance = {});
+
+
+
+// 根据前一段的终点状态，生成下一段三次轨迹的边界条件。
+CubicSegment makeC1Continuation(
+    const TrajectoryPoint& previous_end,
+    double target_position,
+    double target_velocity,
+    double duration);
+
+
+
+
+
+
+
 
 }

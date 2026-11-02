@@ -63,34 +63,88 @@ TrajectoryPoint interpolateCubic(double p0, double p1, double v0, double v1, dou
     return result;
 }
 
-TrajectoryPoint sampleTwoSegmentCubic(
-    const TwoSegmentCubicTrajectory& trajectory,
-    double global_time)
-{
-    // TODO(TRAJ-11B-1): 验证 global_time、两个 duration 有限且 duration > 0；
-    // 相加后的 total_duration 也必须有限。无效输入抛 std::invalid_argument。
-    // TODO(TRAJ-11B-2): 处理全局时间越界静止、第一段/第二段选择；
-    // 第二段将 global_time 转换为局部时间，拼接时刻使用第一段。
-    // 对选中的 segment 复用现有接口，不重复实现多项式：
-    // interpolateCubic(segment.p0, segment.p1, segment.v0, segment.v1,
-    //                  local_time, segment.duration);
-    (void)trajectory;
-    (void)global_time;
-    throw std::logic_error("TRAJ-11B: sampleTwoSegmentCubic TODO");
-}
-
 JunctionContinuity checkJunctionContinuity(
     const TwoSegmentCubicTrajectory& trajectory,
     const ContinuityTolerance& tolerance)
 {
-    // TODO(TRAJ-11B-3): 验证三个容差有限且 >= 0，否则抛 invalid_argument。
-    // 复用六参数 interpolateCubic，分别采样 first 的 t=duration
-    // 和 second 的 t=0；不可使用越界静止状态替代真实边界。
-    // TODO(TRAJ-11B-4): 用 std::abs 计算位置、速度、加速度误差，
-    // 按各自单位的容差判断 C0、C1、C2；高阶连续必须包含低阶连续。
-    (void)trajectory;
-    (void)tolerance;
-    throw std::logic_error("TRAJ-11B: checkJunctionContinuity TODO");
+    // TODO 3：
+    // 检查三个容差：
+    // 1. 必须有限；
+    // 2. 必须 >= 0。
+    if (!std::isfinite(tolerance.position) ||
+        !std::isfinite(tolerance.velocity) ||
+        !std::isfinite(tolerance.acceleration) ||
+        tolerance.position < 0.0 || tolerance.velocity < 0.0 ||
+        tolerance.acceleration < 0.0)
+    {
+        throw std::invalid_argument("Continuity tolerances must be finite and non-negative.");
+    }
+
+    const auto first_end = interpolateCubic(
+        trajectory.first.p0,
+        trajectory.first.p1,
+        trajectory.first.v0,
+        trajectory.first.v1,
+        trajectory.first.duration,
+        trajectory.first.duration);
+
+    const auto second_start = interpolateCubic(
+        trajectory.second.p0,
+        trajectory.second.p1,
+        trajectory.second.v0,
+        trajectory.second.v1,
+        0.0,
+        trajectory.second.duration);
+
+    JunctionContinuity report;
+
+    // TODO 4：
+    // 使用 std::abs() 计算三种误差。
+    //
+    // 然后设置：
+    // C0 = 位置误差满足容差
+    // C1 = C0 && 速度误差满足容差
+    // C2 = C1 && 加速度误差满足容差
+    //
+    // 不要只比较速度就认定 C1 成立。
+    report.position_error = std::abs(first_end.position - second_start.position);
+    report.velocity_error = std::abs(first_end.velocity - second_start.velocity);
+    report.acceleration_error = std::abs(first_end.acceleration - second_start.acceleration);
+
+    report.c0_continuous = report.position_error <= tolerance.position;
+    report.c1_continuous = report.c0_continuous &&
+                           report.velocity_error <= tolerance.velocity;
+    report.c2_continuous = report.c1_continuous &&
+                           report.acceleration_error <= tolerance.acceleration;
+
+    return report;
+}
+
+CubicSegment makeC1Continuation(
+    const TrajectoryPoint& previous_end,
+    double target_position,
+    double target_velocity,
+    double duration)
+{
+    // 1. 验证所有输入有限，duration > 0。
+    if (!std::isfinite(previous_end.position) ||
+        !std::isfinite(previous_end.velocity) ||
+        !std::isfinite(previous_end.acceleration) ||
+        !std::isfinite(target_position) || !std::isfinite(target_velocity) ||
+        !std::isfinite(duration) || duration <= 0.0)
+    {
+        throw std::invalid_argument("Inputs must be finite and duration positive.");
+    }
+
+    // 2. 继承上一段终点的位置和速度；C1 不约束加速度连续。
+    // 3. 构造并返回 CubicSegment。
+    return CubicSegment{
+        .p0 = previous_end.position,
+        .p1 = target_position,
+        .v0 = previous_end.velocity,
+        .v1 = target_velocity,
+        .duration = duration
+    };
 }
 
 }
