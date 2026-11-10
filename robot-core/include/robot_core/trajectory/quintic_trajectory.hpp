@@ -1,5 +1,5 @@
 #pragma once
-
+#include <Eigen/Core>
 #include "robot_core/trajectory/cubic_trajectory.hpp" // 轨迹采样结果TrajectoryPoint
 
 namespace robot_core::trajectory
@@ -88,6 +88,45 @@ TrajectoryPoint interpolateQuintic(
     double t,
     double duration);
 
+// 关节采样
+struct JointTrajectorySample
+{
+    Eigen::VectorXd position;     // rad
+    Eigen::VectorXd velocity;     // rad/s
+    Eigen::VectorXd acceleration; // rad/s²
+};
+
+/**
+ * @brief 使用五次时间规律采样关节空间直线路径。
+ *
+ * 几何路径：
+ *     q(s) = q0 + s * (q1 - q0)
+ *
+ * 时间规律：
+ *     s(0) = 0, s(T) = 1
+ *     s_dot(0) = s_dot(T) = 0
+ *     s_ddot(0) = s_ddot(T) = 0
+ *
+ * @param q0       起点关节位置，单位 rad
+ * @param q1       终点关节位置，单位 rad
+ * @param t        当前采样时间，单位 s
+ * @param duration 总运动时间，单位 s，必须大于 0
+ *
+ * @return 当前关节位置、速度和加速度。
+ *
+ * @throws std::invalid_argument
+ *         维度不一致、空向量、输入非有限或 duration 非正。
+ *
+ * @throws std::overflow_error
+ *         向量计算产生非有限结果。
+ *
+ * @note 本函数生成关节空间直线，通常不保证 TCP 走直线。
+ */
+JointTrajectorySample sampleJointLinearTrajectory(
+    const Eigen::VectorXd& q0,
+    const Eigen::VectorXd& q1,
+    double t,
+    double duration);
 
 //************************贝塞尔曲线 */
 

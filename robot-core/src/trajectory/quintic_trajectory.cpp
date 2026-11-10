@@ -98,24 +98,91 @@ TrajectoryPoint interpolateQuintic(
     const double b0 = p0;
     const double b1 = v0 * T;
     const double b2 = 0.5 * a0 * T * T;
-    const double b3 = 10.0 * delta_p - (6.0 * v0 + 4.0 * v1) * T
-                      - (1.5 * a0 - 0.5 * a1) * T * T;
-    const double b4 = -15.0 * delta_p + (8.0 * v0 + 7.0 * v1) * T
-                      + (1.5 * a0 - a1) * T * T;
-    const double b5 = 6.0 * delta_p - 3.0 * (v0 + v1) * T
-                      - 0.5 * (a0 - a1) * T * T;
+    const double b3 = 10.0 * delta_p - (6.0 * v0 + 4.0 * v1) * T - (1.5 * a0 - 0.5 * a1) * T * T;
+    const double b4 = -15.0 * delta_p + (8.0 * v0 + 7.0 * v1) * T + (1.5 * a0 - a1) * T * T;
+    const double b5 = 6.0 * delta_p - 3.0 * (v0 + v1) * T - 0.5 * (a0 - a1) * T * T;
 
     // TODO 4：按链式法则，速度除以 T，加速度除以 T 两次。
     const double s = t / T;
     TrajectoryPoint result{};
     result.position = b0 + s * (b1 + s * (b2 + s * (b3 + s * (b4 + s * b5))));
-    result.velocity = (b1 + s * (2.0 * b2 + s * (3.0 * b3
-                       + s * (4.0 * b4 + s * 5.0 * b5)))) / T;
-    result.acceleration = (2.0 * b2 + s * (6.0 * b3
-                           + s * (12.0 * b4 + s * 20.0 * b5))) / T / T;
+    result.velocity = (b1 + s * (2.0 * b2 + s * (3.0 * b3 + s * (4.0 * b4 + s * 5.0 * b5)))) / T;
+    result.acceleration = (2.0 * b2 + s * (6.0 * b3 + s * (12.0 * b4 + s * 20.0 * b5))) / T / T;
     return result;
 }
 
+JointTrajectorySample sampleJointLinearTrajectory(
+    const Eigen::VectorXd &q0,
+    const Eigen::VectorXd &q1,
+    double t,
+    double duration)
+{
+    // TODO 1：验证输入
+    // - q0、q1 维度相同且非空
+    // - q0、q1、t、duration 都是有限值
+    // - duration > 0
+    //
+    // 如果已有公共且确实有复用价值的验证代码，可以复用；
+    // 不需要为了本练习额外设计验证工具类。
+    if (q0.size() == 0 || q0.size() != q1.size() ||
+        !q0.allFinite() || !q1.allFinite() ||
+        !std::isfinite(t) || !std::isfinite(duration) || duration <= 0.0)
+    {
+        throw std::invalid_argument(
+            "Joint vectors must be finite, non-empty and equally sized; time must be finite and duration positive.");
+    }
+
+    // TODO 2：生成五次路径进度
+    //
+    // 调用现有 interpolateQuintic()：
+    // - 起点位置 s0 = 0
+    // - 终点位置 s1 = 1
+    // - 起终点速度均为 0
+    // - 起终点加速度均为 0
+    //
+    // 得到：
+    // phase.position     -> s(t)
+    // phase.velocity     -> s_dot(t)
+    // phase.acceleration -> s_ddot(t)
+    //
+    // 若你现有返回成员名称不同，使用项目里的实际名称。
+    auto phase = interpolateQuintic(0.0, 1.0, 0.0, 0.0, 0.0, 0.0, t, duration);
+    if (!std::isfinite(phase.position) ||
+        !std::isfinite(phase.velocity) ||
+        !std::isfinite(phase.acceleration))
+    {
+        throw std::overflow_error("Phase trajectory produced non-finite values.");
+    }
+    // TODO 3：计算关节位移向量
+    //
+    // delta_q = q1 - q0
+    Eigen::VectorXd delta_q = q1 - q0;
+    if (!delta_q.allFinite())
+    {
+        throw std::overflow_error("Joint displacement is not finite.");
+    }
+    JointTrajectorySample result;
+
+    // TODO 4：通过链式法则计算关节状态
+    //
+    // position     = q0 + delta_q * s
+    // velocity     = delta_q * s_dot
+    // acceleration = delta_q * s_ddot
+    result.position = q0 + delta_q * phase.position;
+    result.velocity = delta_q * phase.velocity;
+    result.acceleration = delta_q * phase.acceleration;
+    // TODO 5：检查三个输出向量均为有限值
+    // - 防止有限输入在向量减法或乘法中溢出
+    // - 非有限时抛出 std::overflow_error
+    if (!result.position.allFinite() || !result.velocity.allFinite() ||
+        !result.acceleration.allFinite())
+    {
+        throw std::overflow_error("Joint trajectory calculation produced non-finite values.");
+    }
+
+    // TODO 6：返回结果
+    return result;
+}
 
 QuinticContinuousBounds boundQuinticTrajectory(
     double p0,
@@ -173,7 +240,7 @@ QuinticContinuousBounds boundQuinticTrajectory(
     // TODO 3:
     // 计算速度控制点：
     // V[i] = 5 * (P[i+1] - P[i]) / T
-    for(std::size_t i = 0; i<5; ++ i)
+    for (std::size_t i = 0; i < 5; ++i)
     {
         velocity_control[i] = 5.0 * (position_control[i + 1] - position_control[i]) / T;
         if (!std::isfinite(velocity_control[i]))
@@ -181,7 +248,7 @@ QuinticContinuousBounds boundQuinticTrajectory(
     }
     // 计算加速度控制点：
     // A[i] = 4 * (V[i+1] - V[i]) / T
-    for(std::size_t i = 0; i<4; ++ i)
+    for (std::size_t i = 0; i < 4; ++i)
     {
         acceleration_control[i] = 4.0 * (velocity_control[i + 1] - velocity_control[i]) / T;
         if (!std::isfinite(acceleration_control[i]))
@@ -189,7 +256,7 @@ QuinticContinuousBounds boundQuinticTrajectory(
     }
     // 计算 Jerk 控制点：
     // J[i] = 3 * (A[i+1] - A[i]) / T
-    for(std::size_t i = 0; i<3; ++ i)
+    for (std::size_t i = 0; i < 3; ++i)
     {
         jerk_control[i] = 3.0 * (acceleration_control[i + 1] - acceleration_control[i]) / T;
         if (!std::isfinite(jerk_control[i]))
@@ -202,30 +269,26 @@ QuinticContinuousBounds boundQuinticTrajectory(
     // TODO 4:
     // min_position = P0～P5 的最小值
     // max_position = P0～P5 的最大值
-    auto [min_pos, max_pos] = std::minmax_element(position_control.begin(), position_control.end(), [&](double a, double b) {
-        return a < b;
-    });
+    auto [min_pos, max_pos] = std::minmax_element(position_control.begin(), position_control.end(), [&](double a, double b)
+                                                  { return a < b; });
     bounds.min_position = *min_pos;
     bounds.max_position = *max_pos;
     // max_abs_velocity     = max(abs(V[i]))
-    bounds.max_abs_velocity = std::abs(*std::max_element(velocity_control.begin(), velocity_control.end(), [&](double a, double b) {
-        return std::abs(a) < std::abs(b);
-    }));
+    bounds.max_abs_velocity = std::abs(*std::max_element(velocity_control.begin(), velocity_control.end(), [&](double a, double b)
+                                                         { return std::abs(a) < std::abs(b); }));
     // max_abs_acceleration = max(abs(A[i]))
-    bounds.max_abs_acceleration = std::abs(*std::max_element(acceleration_control.begin(), acceleration_control.end(), [&](double a, double b) {
-        return std::abs(a) < std::abs(b);
-    }));
+    bounds.max_abs_acceleration = std::abs(*std::max_element(acceleration_control.begin(), acceleration_control.end(), [&](double a, double b)
+                                                             { return std::abs(a) < std::abs(b); }));
     // max_abs_jerk         = max(abs(J[i]))
-    bounds.max_abs_jerk = std::abs(*std::max_element(jerk_control.begin(), jerk_control.end(), [&](double a, double b) {
-        return std::abs(a) < std::abs(b);
-    }));
+    bounds.max_abs_jerk = std::abs(*std::max_element(jerk_control.begin(), jerk_control.end(), [&](double a, double b)
+                                                     { return std::abs(a) < std::abs(b); }));
 
     return bounds;
 }
 
 double computeQuinticTimeScale(
-    const QuinticContinuousBounds& bounds,
-    const QuinticKinematicLimits& limits)
+    const QuinticContinuousBounds &bounds,
+    const QuinticKinematicLimits &limits)
 {
     // TODO 1：输入校验
     //
@@ -251,15 +314,15 @@ double computeQuinticTimeScale(
     // TODO 2：计算速度约束所需的缩放系数
     //
     // k_velocity = ?
-    const auto k_velocity = (bounds.max_abs_velocity/limits.max_velocity);
+    const auto k_velocity = (bounds.max_abs_velocity / limits.max_velocity);
 
     // TODO 3：计算加速度约束所需的缩放系数
     //
-    const auto k_acceleration = std::sqrt(bounds.max_abs_acceleration/limits.max_acceleration);
+    const auto k_acceleration = std::sqrt(bounds.max_abs_acceleration / limits.max_acceleration);
 
     // TODO 4：计算 Jerk 约束所需的缩放系数
     //
-    const auto k_jerk = std::cbrt(bounds.max_abs_jerk/limits.max_jerk);
+    const auto k_jerk = std::cbrt(bounds.max_abs_jerk / limits.max_jerk);
 
     // TODO 5：取最终缩放系数
     //

@@ -130,3 +130,21 @@ target_link_libraries(trapezoidal_plan_demo
 
 add_executable(phase_sync_demo examples/trajectory/phase_sync_demo.cpp)
 target_link_libraries(phase_sync_demo PRIVATE robot_trajectory)
+
+# 运动学
+add_library(robot_kinematics STATIC
+    src/kinematics/rigid_transform.cpp
+)
+target_include_directories(robot_kinematics
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_link_libraries(robot_kinematics
+    PUBLIC Eigen3::Eigen
+)
+
+add_executable(rigid_transform_demo
+    test/rigid_transform_demo.cpp
+)
+target_link_libraries(rigid_transform_demo
+    PRIVATE robot_kinematics
+)
