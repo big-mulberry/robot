@@ -116,4 +116,76 @@ Eigen::Isometry3d forwardKinematicsStandardDh(
     const std::vector<StandardDhJoint>& joints,
     const Eigen::VectorXd& q,
     const Eigen::Isometry3d& tool);
+
+/**
+ * @brief 计算串联机器人基于Standard DH的几何Jacobian矩阵。
+ *
+ * @details
+ * 关节速度与TCP空间速度之间满足：
+ *
+ *     [ v_B_TCP     ]                  [ q_dot_1 ]
+ *     [             ] = J_B_TCP(q)  *  [   ...   ]
+ *     [ omega_B_TCP ]                  [ q_dot_n ]
+ *
+ * 其中：
+ * - v_B_TCP     : TCP原点在基坐标系B下的线速度，单位m/s。
+ * - omega_B_TCP : TCP在基坐标系B下的角速度，单位rad/s。
+ * - q_dot       : 关节速度向量，旋转关节rad/s，移动关节m/s。
+ * - J_B_TCP(q)  : 6×N几何Jacobian，上3行线速度，下3行角速度。
+ *
+ * 对于第i个旋转关节（Revolute）：
+ *
+ *     J_i = [ z_(i-1) × (p_TCP - p_(i-1)) ]
+ *           [           z_(i-1)          ]
+ *
+ * 对于第i个移动关节（Prismatic）：
+ *
+ *     J_i = [ z_(i-1) ]
+ *           [    0    ]
+ *
+ * 其中：
+ * - z_(i-1) : 第i个关节轴线的单位方向，在基坐标系B下表达。
+ * - p_(i-1) : 第i个关节轴线上一点，在基坐标系B下表达。
+ * - p_TCP   : TCP原点的位置，在基坐标系B下表达。
+ *
+ * Standard DH坐标系约定：
+ *
+ *     第i个物理关节轴线 = 坐标系{i-1}的Z轴。
+ *
+ * 因此：
+ *
+ *     z_(i-1) = R_B_(i-1) * [0, 0, 1]^T
+ *     p_(i-1) = translation(T_B_(i-1))
+ *
+ * TCP位姿：
+ *
+ *     T_B_TCP = A_1(q_1) * A_2(q_2) * ... * A_n(q_n) * tool
+ *
+ * 最终Jacobian：
+ *
+ *     J_B_TCP(q) = [ J_1  J_2  ...  J_n ]
+ *
+ * @param joints Standard DH关节参数，包含关节类型及DH几何参数。
+ * @param q 关节位置向量，旋转关节单位rad，移动关节单位m。
+ * @param tool 末端DH坐标系{n}到TCP坐标系的固定刚体变换。
+ *
+ * @return Eigen::MatrixXd
+ *         6×N几何Jacobian矩阵，所有速度均在基坐标系B下表达。
+ *
+ * @throws std::invalid_argument
+ *         当关节数量与q维度不一致、输入存在非有限值，
+ *         或tool不是有效的SE(3)变换时抛出。
+ *
+ * @note
+ * - 所有位置和方向必须统一在基坐标系B下表达。
+ * - 计算第i列时，应在右乘A_i之前获取T_B_(i-1)。
+ * - tool中的平移偏置会影响线速度Jacobian。
+ * - tool中的固定旋转不改变基坐标系表达的角速度Jacobian。
+ * - 对于零关节模型，返回6×0矩阵。
+ */
+Eigen::MatrixXd geometricJacobianStandardDh(
+    const std::vector<StandardDhJoint>& joints,
+    const Eigen::VectorXd& q,
+    const Eigen::Isometry3d& tool);
+
 }  // namespace robot_core::kinematics

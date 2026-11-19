@@ -158,3 +158,12 @@ target_link_libraries(ur5e_fk_demo
     PRIVATE
         robot_kinematics
 )
+
+add_executable(geometric_jacobian_demo
+    test/geometric_jacobian_demo.cpp
+)
+
+target_link_libraries(geometric_jacobian_demo
+    PRIVATE
+        robot_kinematics
+)
